@@ -1,0 +1,5 @@
+{
+  "name": "Remix: Project Ayu",
+  "description": "Green-tech platform for medicinal plants and personalized garden services.",
+  "requestFramePermissions": ["microphone"]
+}

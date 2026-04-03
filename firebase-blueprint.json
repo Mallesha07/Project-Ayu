@@ -1,0 +1,89 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "A medicinal plant product available in the store.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the plant." },
+        "price": { "type": "number", "description": "Price of the plant." },
+        "category": { "type": "string", "description": "Category (medicinal, indoor, easy-care)." },
+        "image": { "type": "string", "description": "URL to the plant image." },
+        "description": { "type": "string", "description": "Detailed description of the plant." },
+        "benefits": { "type": "array", "items": { "type": "string" }, "description": "List of health benefits." },
+        "care": { "type": "string", "description": "Care instructions." }
+      },
+      "required": ["name", "price", "category", "image", "description"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A user of the Project Ayu platform.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "User's full name." },
+        "email": { "type": "string", "description": "User's email address." },
+        "role": { "type": "string", "enum": ["admin", "client"], "description": "User's role." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Account creation timestamp." }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "A garden service booking request.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the user who made the booking." },
+        "name": { "type": "string", "description": "Contact name for the booking." },
+        "phone": { "type": "string", "description": "Contact phone number." },
+        "address": { "type": "string", "description": "Service address." },
+        "spaceType": { "type": "string", "enum": ["balcony", "terrace", "indoor"], "description": "Type of space for the garden." },
+        "package": { "type": "string", "enum": ["basic", "standard", "premium"], "description": "Selected service package." },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "completed", "cancelled"], "description": "Current status of the booking." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the booking was created." }
+      },
+      "required": ["userId", "name", "phone", "address", "spaceType", "package", "status"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A plant purchase order.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "UID of the user who placed the order." },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "productId": { "type": "string" },
+              "name": { "type": "string" },
+              "price": { "type": "number" },
+              "quantity": { "type": "integer" }
+            }
+          }
+        },
+        "total": { "type": "number", "description": "Total order amount." },
+        "status": { "type": "string", "enum": ["processing", "shipped", "delivered", "cancelled"], "description": "Order status." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the order was placed." }
+      },
+      "required": ["userId", "items", "total", "status"]
+    }
+  },
+  "firestore": {
+    "/products/{productId}": {
+      "schema": "Product",
+      "description": "Collection of all medicinal plants."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile information."
+    },
+    "/bookings/{bookingId}": {
+      "schema": "Booking",
+      "description": "Garden service booking requests."
+    },
+    "/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Customer purchase orders."
+    }
+  }
+}

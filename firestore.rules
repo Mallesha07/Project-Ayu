@@ -1,0 +1,159 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: products
+    // Document ID: productId
+    // Fields:
+    //   - name: string (required, 1-100 chars)
+    //   - price: number (required, positive)
+    //   - category: string (required, enum: medicinal, indoor, easy-care)
+    //   - image: string (required, valid URL)
+    //   - description: string (required, 1-2000 chars)
+    //   - benefits: list of strings (optional, max 20 items)
+    //   - care: string (optional, 1-1000 chars)
+    //
+    // Collection: users
+    // Document ID: userId (UID)
+    // Fields:
+    //   - name: string (required, 1-100 chars)
+    //   - email: string (required, valid email)
+    //   - role: string (required, enum: admin, client)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: bookings
+    // Document ID: bookingId
+    // Fields:
+    //   - userId: string (required, UID)
+    //   - name: string (required, 1-100 chars)
+    //   - phone: string (required, 1-20 chars)
+    //   - address: string (required, 1-500 chars)
+    //   - spaceType: string (required, enum: balcony, terrace, indoor)
+    //   - package: string (required, enum: basic, standard, premium)
+    //   - status: string (required, enum: pending, confirmed, completed, cancelled)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: orders
+    // Document ID: orderId
+    // Fields:
+    //   - userId: string (required, UID)
+    //   - items: list of maps (required, max 50 items)
+    //   - total: number (required, positive)
+    //   - status: string (required, enum: processing, shipped, delivered, cancelled)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "7760mallesh@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string && (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidProduct(data) {
+      return hasRequiredFields(['name', 'price', 'category', 'image', 'description']) &&
+             hasOnlyAllowedFields(['name', 'price', 'category', 'image', 'description', 'benefits', 'care']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.price is number && data.price > 0 &&
+             data.category in ['medicinal', 'indoor', 'easy-care'] &&
+             isValidUrl(data.image) &&
+             data.description is string && data.description.size() > 0 && data.description.size() <= 2000;
+    }
+
+    function isValidUser(data) {
+      return hasRequiredFields(['name', 'email', 'role', 'createdAt']) &&
+             hasOnlyAllowedFields(['name', 'email', 'role', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'client'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidBooking(data) {
+      return hasRequiredFields(['userId', 'name', 'phone', 'address', 'spaceType', 'package', 'status', 'createdAt']) &&
+             hasOnlyAllowedFields(['userId', 'name', 'phone', 'address', 'spaceType', 'package', 'status', 'createdAt']) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.phone is string && data.phone.size() > 0 && data.phone.size() <= 20;
+    }
+
+    function isValidOrder(data) {
+      return hasRequiredFields(['userId', 'items', 'total', 'status', 'createdAt']) &&
+             hasOnlyAllowedFields(['userId', 'items', 'total', 'status', 'createdAt']) &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.items is list && data.items.size() <= 50 &&
+             data.total is number && data.total > 0;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /products/{productId} {
+      allow read: if true; // Products are publicly viewable
+      allow create, update: if isAdmin() && isValidProduct(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == 'client' || isAdmin());
+      allow update: if isAuthenticated() && isOwner(userId) && isValidUser(request.resource.data) && (request.resource.data.role == resource.data.role || isAdmin());
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidBooking(request.resource.data);
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin()) && isValidBooking(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidOrder(request.resource.data);
+      allow update: if isAdmin(); // Only admins can update order status
+      allow delete: if false; // Orders should not be deleted
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
